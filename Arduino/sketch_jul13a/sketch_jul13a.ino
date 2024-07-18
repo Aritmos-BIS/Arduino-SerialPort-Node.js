@@ -23,13 +23,13 @@ String getNameFromUID(byte *uid, byte uidSize) {
   const byte uid4[] = {0x3A, 0xB4, 0x02, 0x03}; // UID de Ari
 
   if (memcmp(uid, uid1, uidSize) == 0) {
-    return "Axo";
+    return "2"; //id 2 es Axo
   } else if (memcmp(uid, uid2, uidSize) == 0) {
-    return "Cacti";
+    return "3"; //id 3 es Cacti
   } else if (memcmp(uid, uid3, uidSize) == 0) {
-    return "Monarc";
+    return "4"; //id 4 es Monarc
   } else if (memcmp(uid, uid4, uidSize) == 0) {
-    return "Ari";
+    return "1"; //id 1 es Ari
   } else {
     return "Unknown";
   }
@@ -48,6 +48,7 @@ void setup() {
 }
 
 void loop() {
+  String printName;
   if (!mfrc522.PICC_IsNewCardPresent()) // si no hay una tarjeta presente retorna al loop esperando por una tarjeta
     return;              
   
@@ -58,16 +59,30 @@ void loop() {
   
   // Obtener y enviar el nombre correspondiente al puerto serial
   String name = getNameFromUID(mfrc522.uid.uidByte, mfrc522.uid.size);
-  
+  int intName = name.toInt(); // Variable para almacenar el nombre a imprimir
+    switch (intName) {
+    case 1:
+      printName = "Ari";
+      break;
+    case 2:
+      printName = "Axo";
+      break;
+    case 3:
+      printName = "Cacti";
+      break;
+    default:
+      printName = "Monarc";
+      break;
+    }
   if (isFirstRead) {
     Serial.print("Arimal 1: ");
     lcd.setCursor(0, 0); // ubica cursor en columna 0 y linea 0
     lcd.clear();
-    lcd.print("J1: " + name); // escribe el texto
+    lcd.print("J1: " + printName); // escribe el texto
   } else {
     Serial.print("Arimal 2: ");
     lcd.setCursor(0, 1); // ubica cursor en columna 0 y linea 1
-    lcd.print("J2: " + name); // escribe el texto
+    lcd.print("J2: " + printName); // escribe el texto
   }
 
   Serial.println(name);
