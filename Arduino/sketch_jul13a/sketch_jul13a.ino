@@ -15,6 +15,9 @@ MFRC522 mfrc522(SS_PIN, RST_PIN);    // crea objeto mfrc522 enviando pines de sl
 LiquidCrystal_I2C lcd(0x27, 2, 1, 0, 4, 5, 6, 7); // DIR, E, RW, RS, D4, D5, D6, D7
 
 bool isFirstRead = true;
+bool battleActive = false;
+String player1HP = "100hp";
+String player2HP = "100hp";
 
 String getNameFromUID(byte *uid, byte uidSize) {
   const byte uid1[] = {0xE3, 0x76, 0x97, 0x2F}; // UID de Axo
@@ -49,6 +52,25 @@ void setup() {
 
 void loop() {
   String printName;
+   if (Serial.available()) {
+    String command = Serial.readStringUntil('\n');
+    command.trim();
+    if (command == "ACTIVE_BATTLE") {
+      battleActive = true;
+       Serial.println("Batalla Activa");
+    } else if (command == "NO_ACTIVE_BATTLE") {
+  battleActive = false;
+  Serial.println("Batalla Inactiva");
+  battleActive = false;
+} else {
+  Serial.println("Comando desconocido");
+}
+
+   }
+   if (battleActive){
+    
+    return;
+   }
   if (!mfrc522.PICC_IsNewCardPresent()) // si no hay una tarjeta presente retorna al loop esperando por una tarjeta
     return;              
   
