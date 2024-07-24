@@ -1,13 +1,15 @@
-#include <SPI.h>         // incluye libreria bus SPI
-#include <MFRC522.h>     // incluye libreria especifica para MFRC522
-#include <Wire.h>        // libreria de comunicacion por I2C
-#include <LCD.h>         // libreria para funciones de LCD
-#include <LiquidCrystal_I2C.h>     // libreria para LCD por I2C
+#include <SPI.h>
+#include <MFRC522.h>
+#include <Wire.h>
+#include <LCD.h>
+#include <LiquidCrystal_I2C.h>
 
 #define NOTE_DS8 4978
 #define BUTTON_PIN  7
 
 const int buzzerPin = 8; // Declarar el pin del buzzer
+const int led1Pin = 4;   // LED para jugador 1
+const int led2Pin = 2;   // LED para jugador 2
 #define RST_PIN  9       // constante para referenciar pin de reset
 #define SS_PIN  10       // constante para referenciar pin de slave select
 
@@ -16,8 +18,8 @@ LiquidCrystal_I2C lcd(0x27, 2, 1, 0, 4, 5, 6, 7); // DIR, E, RW, RS, D4, D5, D6,
 
 bool isFirstRead = true;
 bool battleActive = false;
-String player1HP = "100hp";
-String player2HP = "100hp";
+int player1HP = 100;
+int player2HP = 100;
 
 String getNameFromUID(byte *uid, byte uidSize) {
   const byte uid1[] = {0xE3, 0x76, 0x97, 0x2F}; // UID de Axo
@@ -39,50 +41,83 @@ String getNameFromUID(byte *uid, byte uidSize) {
 }
 
 void setup() {
-  Serial.begin(9600);      
-  SPI.begin();           
+  Serial.begin(9600);
+  SPI.begin();
   mfrc522.PCD_Init();
 
-  lcd.setBacklightPin(3, POSITIVE); // puerto P3 de PCF8574 como positivo
-  lcd.setBacklight(HIGH); // habilita iluminacion posterior de LCD
-  lcd.begin(16, 2); // 16 columnas por 2 lineas para LCD 1602A
-  lcd.clear(); // limpia pantalla
-  pinMode(buzzerPin, OUTPUT); // Configurar el pin del buzzer como salida
+  lcd.setBacklightPin(3, POSITIVE);
+  lcd.setBacklight(HIGH);
+  lcd.begin(16, 2);
+  lcd.clear();
+
+  pinMode(buzzerPin, OUTPUT);
+  pinMode(led1Pin, OUTPUT);
+  pinMode(led2Pin, OUTPUT);
+
+  digitalWrite(led1Pin, LOW);
+  digitalWrite(led2Pin, LOW);
 }
 
 void loop() {
-  String printName;
-   if (Serial.available()) {
+  if (Serial.available()) {
     String command = Serial.readStringUntil('\n');
     command.trim();
+    Serial.println("Comando recibido: " + command); // Debugging
+
     if (command == "ACTIVE_BATTLE") {
       battleActive = true;
-       Serial.println("Batalla Activa");
+      Serial.println("Batalla Activa");
     } else if (command == "NO_ACTIVE_BATTLE") {
-  battleActive = false;
-  Serial.println("Batalla Inactiva");
-  battleActive = false;
-} else {
-  Serial.println("Comando desconocido");
-}
+      battleActive = false;
+      Serial.println("Batalla Inactiva");
+      digitalWrite(led1Pin, LOW);  // Apagar el LED del jugador 1
+      digitalWrite(led2Pin, LOW);  // Apagar el LED del jugador 2
+      lcd.clear();// esto se va a cambiar por una animación y / o melodia de victoria
+    }else if (command == "BATTLE_NOT_FOUND") {
+      battleActive = false;
+      Serial.println("Batalla Inactiva");
+      digitalWrite(led1Pin, LOW);  // Apagar el LED del jugador 1
+      digitalWrite(led2Pin, LOW);  // Apagar el LED del jugador 2
+      lcd.setCursor(0, 0);
+      lcd.print("Batalla no");
+      lcd.setCursor(0, 1);
+      lcd.print("encontrada");
+      delay(3000);
+      lcd.clear();// esto se va a cambiar por una animación y / o melodia de victoria
+    } else if (command.startsWith("Player1HP:")) {
+      player1HP = command.substring(command.indexOf(':') + 1).toInt();
+      Serial.println("Player1HP: " + String(player1HP)); // Debugging
+      lcd.setCursor(0, 0);
+      lcd.clear();
+      lcd.print("J1: " + String(player1HP) + " ");
+    } else if (command.startsWith("Player2HP:")) {
+      player2HP = command.substring(command.indexOf(':') + 1).toInt();
+      Serial.println("Player2HP: " + String(player2HP)); // Debugging
+      lcd.setCursor(0, 1);
+      lcd.print("J2: " + String(player2HP) + " ");
+    } else {
+      Serial.println("Comando desconocido");
+    }
+  }
 
-   }
-   if (battleActive){
-    
+  if (battleActive) {
     return;
-   }
-  if (!mfrc522.PICC_IsNewCardPresent()) // si no hay una tarjeta presente retorna al loop esperando por una tarjeta
-    return;              
-  
-  if (!mfrc522.PICC_ReadCardSerial()) // si no puede obtener datos de la tarjeta
-    return;              // retorna al loop esperando por otra tarjeta
+  }
 
-  Serial.println();       // nueva linea
-  
-  // Obtener y enviar el nombre correspondiente al puerto serial
+  if (!mfrc522.PICC_IsNewCardPresent()) {
+    return;
+  }
+
+  if (!mfrc522.PICC_ReadCardSerial()) {
+    return;
+  }
+
+  Serial.println();
   String name = getNameFromUID(mfrc522.uid.uidByte, mfrc522.uid.size);
-  int intName = name.toInt(); // Variable para almacenar el nombre a imprimir
-    switch (intName) {
+  String printName;
+
+  int intName = name.toInt();
+  switch (intName) {
     case 1:
       printName = "Ari";
       break;
@@ -92,26 +127,32 @@ void loop() {
     case 3:
       printName = "Cacti";
       break;
-    default:
+    case 4:
       printName = "Monarc";
       break;
-    }
+    default:
+      printName = "Unknown";
+  }
+
   if (isFirstRead) {
     Serial.print("Arimal 1: ");
-    lcd.setCursor(0, 0); // ubica cursor en columna 0 y linea 0
+    lcd.setCursor(0, 0);
     lcd.clear();
-    lcd.print("J1: " + printName); // escribe el texto
+    lcd.print("J1: " + printName);
+    digitalWrite(led1Pin, HIGH); // Enciende el LED del jugador 1
   } else {
     Serial.print("Arimal 2: ");
-    lcd.setCursor(0, 1); // ubica cursor en columna 0 y linea 1
-    lcd.print("J2: " + printName); // escribe el texto
+    lcd.setCursor(0, 1);
+    lcd.print("J2: " + printName);
+    
+    digitalWrite(led2Pin, HIGH); // Enciende el LED del jugador 2
   }
 
   Serial.println(name);
-  mfrc522.PICC_HaltA();   // detiene comunicacion con tarjeta
-  tone(buzzerPin, 1000); // Reproduce un tono de 1000Hz
-  delay(50); // Espera 500 milisegundos
-  noTone(buzzerPin); // Apaga el buzzer
+  mfrc522.PICC_HaltA();
+  tone(buzzerPin, 1000);
+  delay(50);
+  noTone(buzzerPin);
 
-  isFirstRead = !isFirstRead; // Cambiar el estado para la próxima lectura
+  isFirstRead = !isFirstRead;
 }

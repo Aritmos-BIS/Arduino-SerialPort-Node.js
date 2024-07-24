@@ -11,8 +11,7 @@ const parser = port.pipe(new ReadlineParser({ delimiter: '\r\n' }));
 let arimal1Id = '';
 let arimal2Id = '';
 let ActiveBattle = false;
-let player1HP = '100hp';
-let player2HP = '100hp';
+let intervalId = null;
 
 port.on('open', () => {
   console.log('Serial port opened');
@@ -37,24 +36,17 @@ parser.on('data', async (line) => {
 
   if (arimal1Id && arimal2Id) {
     ActiveBattle = true;
-    // await sendArimalData(arimal1Id, arimal2Id); 
+    await sendArimalData(arimal1Id, arimal2Id);
     arimal1Id = '';
     arimal2Id = '';
   
     // Imprime el mensaje ACTIVE_BATTLE
     port.write('ACTIVE_BATTLE\n');
   
-    // Espera 10 segundos antes de continuar
-    setTimeout(() => {
-      // Envía el mensaje NO_ACTIVE_BATTLE después de la espera
-      port.write('NO_ACTIVE_BATTLE\n');
-    }, 10000); // 10000 milisegundos equivalen a 10 segundos
+    // Inicia el ciclo de obtener HP cada 5 segundos
+    intervalId = setInterval(fetchHpData, 5000);
   }
-  
 });
-if (ActiveBattle){
-  
-}
 
 async function sendArimalData(arimal1Id, arimal2Id) {
   const fetch = (await import('node-fetch')).default;
@@ -71,7 +63,7 @@ async function sendArimalData(arimal1Id, arimal2Id) {
     }
   };
 
-  fetch('https:/localhost:3000/api/battle/arimals', {
+  fetch('http://localhost:3000/api/battle/arimals', {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json'
@@ -81,6 +73,37 @@ async function sendArimalData(arimal1Id, arimal2Id) {
     .then(response => response.json())
     .then(data => {
       console.log('Success:', data);
+    })
+    .catch((error) => {
+      console.error('Error:', error);
+    });
+}
+
+async function fetchHpData() {
+  const fetch = (await import('node-fetch')).default;
+
+  fetch('http://localhost:3000/api/battle/hp')
+    .then(response => response.json())
+    .then(data => {
+      console.log('HP Data:', data);
+      const { player1Hp, player2Hp } = data;
+      
+      // Enviar los datos de HP al Arduino
+      port.write(`Player1HP: ${player1Hp}\n`);
+      port.write(`Player2HP: ${player2Hp}\n`);
+
+      // Detener la batalla si la HP de alguno de los jugadores es 0 o menos
+      if (player1Hp <= 0 || player2Hp <= 0) {
+        clearInterval(intervalId);
+        port.write('NO_ACTIVE_BATTLE\n');
+        ActiveBattle = false;
+    } 
+    if (player1Hp === undefined || player2Hp === undefined) {
+      clearInterval(intervalId);
+      port.write('BATTLE_NOT_FOUND\n');
+      ActiveBattle = false;
+  } 
+         
     })
     .catch((error) => {
       console.error('Error:', error);
