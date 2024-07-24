@@ -72,6 +72,7 @@ void loop() {
       Serial.println("Batalla Inactiva");
       digitalWrite(led1Pin, LOW);  // Apagar el LED del jugador 1
       digitalWrite(led2Pin, LOW);  // Apagar el LED del jugador 2
+
       lcd.clear();// esto se va a cambiar por una animación y / o melodia de victoria
     }else if (command == "BATTLE_NOT_FOUND") {
       battleActive = false;
